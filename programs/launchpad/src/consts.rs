@@ -1,0 +1,59 @@
+use solana_program::pubkey::Pubkey;
+
+pub const ANCHOR_DISCRIMINATOR: usize = 8;
+
+pub const DEFAULT_PRICE_FACTOR_NUMERATOR: u64 = 3;
+pub const DEFAULT_PRICE_FACTOR_DENOMINATOR: u64 = 1;
+
+pub const DEFAULT_MAX_M_LP: u128 = 310_000_000_000_000; // 310B tokens for Airdrop
+pub const DEFAULT_MAX_M: u128 = 690_000_000_000_000; // 690B tokens for trading
+
+pub const MAX_MEME_TOKENS: u128 = DEFAULT_MAX_M_LP + DEFAULT_MAX_M;
+
+pub const DECIMALS_S: u128 = 1_000_000_000;
+
+pub const MAX_AIRDROPPED_TOKENS: u64 = 100_000_000_000_000;
+
+#[cfg(feature = "localnet-testing")]
+pub const LOCK_TIME: i64 = 4; // 4 seconds
+#[cfg(feature = "mainnet-testing")]
+pub const LOCK_TIME: i64 = 60; // 1 minute
+#[cfg(feature = "mainnet")]
+pub const LOCK_TIME: i64 = 3600; // 1 hour
+
+#[cfg(feature = "localnet-testing")]
+pub const DEFAULT_CLIFF: i64 = 5; // 5 seconds
+#[cfg(feature = "mainnet-testing")]
+pub const DEFAULT_CLIFF: i64 = 180; // 3 minutes
+#[cfg(feature = "mainnet")]
+pub const DEFAULT_CLIFF: i64 = 86_400; // 1 day
+
+#[cfg(feature = "localnet-testing")]
+pub const MIN_LINEAR: i64 = 10; // 10 seconds
+#[cfg(feature = "mainnet-testing")]
+pub const MIN_LINEAR: i64 = 600; // 10 minutes
+#[cfg(feature = "mainnet")]
+pub const MIN_LINEAR: i64 = 86_400; // 1 day
+
+#[cfg(feature = "testing")]
+pub const ADMIN_KEY: Pubkey =
+    solana_program::pubkey!("8JvLLwD7oBvPfg3NL1dAL7GbQJuJznP4MhsYnfNkKjAR");
+#[cfg(feature = "mainnet")]
+pub const ADMIN_KEY: Pubkey =
+    solana_program::pubkey!("KZbAoMgCcb2gDEn2Ucea86ux84y25y3ybbWQGQpd9D6");
+
+#[cfg(feature = "testing")]
+pub const SWAP_AUTH_KEY: Pubkey =
+    solana_program::pubkey!("8JvLLwD7oBvPfg3NL1dAL7GbQJuJznP4MhsYnfNkKjAR");
+#[cfg(feature = "mainnet")]
+pub const SWAP_AUTH_KEY: Pubkey =
+    solana_program::pubkey!("389y4YsTxFKpz2HxVHpvDk13FSXan48LZQtGv8pD4vQA");
+pub const SWAP_AUTH_KEY: Pubkey =
+    solana_program::pubkey!("389y4YsTxFKpz2HxVHpvDk13FSXan48LZQtGv8pD4vQA");
+
+pub const SWAP_FEE_KEY: Pubkey =
+    solana_program::pubkey!("xqzvZzKFCjvPuRqkyg5rxA95avrvJxesZ41rCLfYwUM");
+pub const LP_FEE_KEY: Pubkey =
+    solana_program::pubkey!("HQ1wVLaBcnuoUozegyX7r45yn6ogHvQjdPNj53iweC5V");
+pub const BP_FEE_KEY: Pubkey =
+    solana_program::pubkey!("CvBMs2LEp8KbfCvPNMawR5cFyQ1k9ac7xrtCoxu1Y2gH");
