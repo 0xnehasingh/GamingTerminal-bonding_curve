@@ -7,3 +7,17 @@ test-ledger
 .yarn
 
 Cargo.lock
+.next/
+tsconfig.tsbuildinfo
+.claude/
+.prettierignore
+*.log
+*.local
+*.env
+*.swp
+*.swo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+coverage/
