@@ -14,7 +14,7 @@ import {
   Target,
   ArrowUpRight,
   ArrowDownRight,
-
+  RefreshCw,
   Star,
   Trophy,
   Coins
@@ -25,6 +25,9 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useRealSmartContract } from "@/hooks/useRealSmartContract";
+import { SmartContractTester } from "@/components/debug/SmartContractTester";
+import { FeaturedTokensGrid } from "@/components/dashboard/FeaturedTokensGrid";
 
 // Animated Radial Chart Component
 function AnimatedRadialChart({ 
@@ -108,121 +111,70 @@ function AnimatedRadialChart({
 // Main Dashboard Component
 export function Dashboard() {
   const [selectedTimeframe, setSelectedTimeframe] = useState("24h");
+  const { pools, metrics, isLoading, error, refreshContractData } = useRealSmartContract();
 
-  const metrics = [
+  // Format metrics data for display from smart contract
+  const formattedMetrics = [
     {
       title: "Total Pools Created",
-      value: "1,247",
-      change: "+12.5%",
-      trend: "up",
+      value: metrics.totalPools.toLocaleString(),
+      change: "+12.5%", // Could be calculated from historical data
+      trend: "up" as const,
       icon: Gamepad2,
       color: "text-purple-400",
       bgColor: "bg-purple-500/10",
     },
     {
       title: "Trading Volume",
-      value: "$2.4M",
+      value: metrics.totalVolume > 1000000 
+        ? `$${(metrics.totalVolume / 1000000).toFixed(1)}M`
+        : metrics.totalVolume > 1000
+        ? `$${(metrics.totalVolume / 1000).toFixed(0)}K`
+        : `$${metrics.totalVolume.toFixed(0)}`,
       change: "+8.2%",
-      trend: "up",
+      trend: "up" as const,
       icon: DollarSign,
       color: "text-green-400",
       bgColor: "bg-green-500/10",
     },
     {
       title: "Active Traders",
-      value: "8,932",
+      value: metrics.activeTraders.size.toLocaleString(),
       change: "-2.1%",
-      trend: "down",
+      trend: "down" as const,
       icon: Users,
       color: "text-blue-400",
       bgColor: "bg-blue-500/10",
     },
     {
       title: "Migration Success",
-      value: "94.7%",
+      value: `${metrics.migrationSuccessRate.toFixed(1)}%`,
       change: "+1.3%",
-      trend: "up",
+      trend: "up" as const,
       icon: Rocket,
       color: "text-orange-400",
       bgColor: "bg-orange-500/10",
     },
   ];
 
-  const featuredPools = [
-    {
-      name: "PEPE Terminal",
-      symbol: "PEPE",
-      progress: 85,
-      raised: "$420K",
-      target: "$500K",
-      participants: 1247,
-      timeLeft: "2d 14h",
-      status: "active",
-    },
-    {
-      name: "SHIB Rocket",
-      symbol: "SHIB",
-      progress: 92,
-      raised: "$736K",
-      target: "$800K",
-      participants: 2156,
-      timeLeft: "1d 8h",
-      status: "active",
-    },
-    {
-      name: "DOGE Launch",
-      symbol: "DOGE",
-      progress: 78,
-      raised: "$312K",
-      target: "$400K",
-      participants: 892,
-      timeLeft: "3d 2h",
-      status: "active",
-    },
-  ];
+  // Activity icons mapping
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'pool_created': return Zap;
+      case 'trade': return TrendingUp;
+      case 'migration': return Rocket;
+      default: return Activity;
+    }
+  };
 
-  const recentActivity = [
-    {
-      type: "pool_created",
-      user: "0x1234...5678",
-      action: "Created new pool",
-      token: "WOJAK",
-      amount: "$50K",
-      time: "2m ago",
-      icon: Zap,
-      color: "text-purple-400",
-    },
-    {
-      type: "trade",
-      user: "0x8765...4321",
-      action: "Bought tokens",
-      token: "PEPE",
-      amount: "$12.5K",
-      time: "5m ago",
-      icon: TrendingUp,
-      color: "text-green-400",
-    },
-    {
-      type: "migration",
-      user: "0x9876...1234",
-      action: "Migrated to DEX",
-      token: "SHIB",
-      amount: "$800K",
-      time: "12m ago",
-      icon: Rocket,
-      color: "text-blue-400",
-    },
-    {
-      type: "trade",
-      user: "0x5432...8765",
-      action: "Sold tokens",
-      token: "DOGE",
-      amount: "$8.2K",
-      time: "18m ago",
-      icon: TrendingDown,
-      color: "text-red-400",
-    },
-  ];
+  const getActivityColor = (type: string) => {
+    switch (type) {
+      case 'pool_created': return 'text-purple-400';
+      case 'trade': return 'text-green-400';
+      case 'migration': return 'text-blue-400';
+      default: return 'text-gray-400';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
@@ -246,6 +198,15 @@ export function Dashboard() {
           </div>
           
           <div className="flex items-center gap-4">
+            <Button
+              onClick={refreshContractData}
+              disabled={isLoading}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              <RefreshCw className={cn("w-4 h-4 mr-2", isLoading && "animate-spin")} />
+              {isLoading ? "Refreshing..." : "Refresh Data"}
+            </Button>
+            
             <div className="flex bg-slate-800/50 rounded-lg p-1">
               {["1h", "24h", "7d", "30d"].map((timeframe) => (
                 <button
@@ -262,6 +223,28 @@ export function Dashboard() {
                 </button>
               ))}
             </div>
+            <Button 
+              onClick={refreshContractData}
+              variant="outline"
+              disabled={isLoading}
+              className="border-purple-500/30 text-purple-400 hover:bg-purple-600 hover:text-white"
+            >
+              <RefreshCw className={cn("w-4 h-4 mr-2", isLoading && "animate-spin")} />
+              Refresh Contract Data
+            </Button>
+            {error && (
+              <div className={cn(
+                "px-3 py-1 border rounded text-sm",
+                error.includes("Rate limited") || error.includes("demo data")
+                  ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-400"
+                  : "bg-red-500/10 border-red-500/30 text-red-400"
+              )}>
+                {error.includes("Rate limited") || error.includes("demo data") 
+                  ? "🔄 Using demo data (rate limited)" 
+                  : `Contract Error: ${error.slice(0, 30)}...`
+                }
+              </div>
+            )}
             <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
               <Gamepad2 className="w-4 h-4 mr-2" />
               Create Pool
@@ -276,7 +259,7 @@ export function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
         >
-          {metrics.map((metric, index) => (
+          {formattedMetrics.map((metric, index) => (
             <motion.div
               key={metric.title}
               initial={{ opacity: 0, scale: 0.9 }}
@@ -311,131 +294,58 @@ export function Dashboard() {
           ))}
         </motion.div>
 
-        {/* Featured Pools and Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Featured Pools */}
-          <motion.div 
-            className="lg:col-span-2"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-          >
-            <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Trophy className="h-5 w-5 text-yellow-400" />
-                  Featured Memecoin Pools
-                </CardTitle>
-                <CardDescription>
-                  Top performing pools with highest activity
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {featuredPools.map((pool, index) => (
-                  <motion.div
-                    key={pool.name}
-                    className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/30 hover:border-purple-500/30 transition-all duration-300 bonding-curve"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.3 + index * 0.1 }}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
-                          <Coins className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-white">{pool.name}</h3>
-                          <p className="text-sm text-slate-400">{pool.symbol}</p>
-                        </div>
-                      </div>
-                      <Badge 
-                        variant="outline" 
-                        className="border-green-500/30 text-green-400"
-                      >
-                        {pool.status}
-                      </Badge>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-400">Progress</span>
-                        <span className="text-white">{pool.progress}%</span>
-                      </div>
-                      <Progress value={pool.progress} className="h-2" />
-                      
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="text-slate-400">Raised: </span>
-                          <span className="text-green-400 font-medium">{pool.raised}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400">Target: </span>
-                          <span className="text-white">{pool.target}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400">Participants: </span>
-                          <span className="text-blue-400">{pool.participants}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400">Time left: </span>
-                          <span className="text-orange-400">{pool.timeLeft}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Recent Activity */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-          >
-            <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-blue-400" />
-                  Recent Activity
-                </CardTitle>
-                <CardDescription>
-                  Live trading and pool updates
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {recentActivity.map((activity, index) => (
-                  <motion.div
-                    key={index}
-                    className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/20 hover:bg-slate-800/40 transition-all duration-300"
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.4, delay: 0.4 + index * 0.1 }}
-                  >
-                    <div className={cn("p-2 rounded-lg bg-slate-800/50")}>
-                      <activity.icon className={cn("h-4 w-4", activity.color)} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white">
-                        <span className="text-slate-400">{activity.user}</span>
-                        <br />
-                        {activity.action} <span className="text-purple-400">{activity.token}</span>
-                      </p>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-sm font-medium text-green-400">{activity.amount}</span>
-                        <span className="text-xs text-slate-500">
-                          {activity.time}
-                        </span>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
+        {/* Featured Tokens Grid */}
+        <motion.div 
+          className="w-full"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+        >
+                      <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-2">All Minted Tokens</h2>
+                <p className="text-slate-400">
+                  {error && (error.includes("Rate limited") || error.includes("demo data"))
+                    ? "Showing demo data due to rate limiting"
+                    : `Showing ${pools.filter(p => p.tokenName && p.tokenSymbol).length} tokens with real blockchain metadata from smart contract ip6SLxttjbSrQggmM2SH5RZXhWKq3onmkzj3kExoceN`
+                  }
+                  {error && (error.includes("Rate limited") || error.includes("demo data")) && (
+                    <Badge variant="outline" className="ml-2 border-yellow-500/30 text-yellow-400 text-xs">
+                      Demo Data
+                    </Badge>
+                  )}
+                  {!error && (
+                    <Badge variant="outline" className="ml-2 border-green-500/30 text-green-400 text-xs">
+                      {pools.filter(p => p.tokenName && p.tokenSymbol).length} Real Tokens
+                    </Badge>
+                  )}
+                </p>
+              </div>
+              <Button
+                onClick={refreshContractData}
+                disabled={isLoading}
+                variant="outline"
+                size="sm"
+                className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin mr-2" />
+                    Refreshing...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh
+                  </>
+                )}
+              </Button>
+            </div>
+          
+          <FeaturedTokensGrid pools={pools} isLoading={isLoading} />
+        </motion.div>
 
         {/* Charts and Migration Progress */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -453,7 +363,7 @@ export function Dashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex items-center justify-center py-8">
-                <AnimatedRadialChart value={94} size={200} />
+                <AnimatedRadialChart value={metrics.migrationSuccessRate} size={200} />
               </CardContent>
             </Card>
           </motion.div>
@@ -499,6 +409,15 @@ export function Dashboard() {
             </Card>
           </motion.div>
         </div>
+
+        {/* Smart Contract Tester */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.6 }}
+        >
+          <SmartContractTester />
+        </motion.div>
       </div>
     </div>
   );

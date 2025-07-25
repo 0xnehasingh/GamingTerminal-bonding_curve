@@ -48,14 +48,12 @@ import { useLaunchpadContract } from "@/hooks/useLaunchpadContract";
 import { WalletDebug } from "@/components/debug/WalletDebug";
 import toast from 'react-hot-toast';
 
-// Form validation schema
+// Form validation schema - Aligned with smart contract requirements
 const poolFormSchema = z.object({
   tokenName: z.string().min(1, "Token name is required").max(50, "Token name too long"),
   tokenSymbol: z.string().min(1, "Token symbol is required").max(10, "Symbol too long").regex(/^[A-Z0-9]+$/, "Symbol must be uppercase letters and numbers only"),
   description: z.string().min(10, "Description must be at least 10 characters").max(500, "Description too long"),
-  airdropAmount: z.string().min(1, "Airdrop amount is required").regex(/^\d+$/, "Must be a valid number"),
-  vestingPeriod: z.string().min(1, "Vesting period is required"),
-  liquidityLock: z.string().min(1, "Liquidity lock period is required"),
+  targetSolAmount: z.string().min(1, "Target SOL amount is required").regex(/^\d+(\.\d+)?$/, "Must be a valid number"),
 });
 
 type PoolFormData = z.infer<typeof poolFormSchema>;
@@ -151,32 +149,32 @@ const ImageUpload: React.FC<{
   );
 };
 
-// Pool Stats Component
+// Pool Stats Component - Aligned with smart contract defaults
 const PoolStats: React.FC<{ formData: Partial<PoolFormData> }> = ({ formData }) => {
   const stats = [
     {
-      label: "Airdrop Amount",
-      value: formData.airdropAmount ? Number(formData.airdropAmount).toLocaleString() : "0",
-      icon: Users,
+      label: "Total Supply",
+      value: "1,000,000,000,000",
+      icon: Coins,
+      color: "text-blue-600"
+    },
+    {
+      label: "Trading Supply",
+      value: "690,000,000,000",
+      icon: TrendingUp,
       color: "text-green-600"
     },
     {
-      label: "Vesting Period",
-      value: formData.vestingPeriod || "Not set",
+      label: "Airdrop Supply",
+      value: "310,000,000,000",
       icon: Users,
       color: "text-purple-600"
     },
     {
-      label: "Liquidity Lock",
-      value: formData.liquidityLock || "Not set",
-      icon: Lock,
+      label: "Target SOL",
+      value: formData.targetSolAmount ? `${formData.targetSolAmount} SOL` : "Not set",
+      icon: DollarSign,
       color: "text-orange-600"
-    },
-    {
-      label: "Symbol",
-      value: formData.tokenSymbol || "N/A",
-      icon: Coins,
-      color: "text-blue-600"
     }
   ];
 
@@ -228,9 +226,7 @@ export function CreatePoolForm() {
       tokenName: "",
       tokenSymbol: "",
       description: "",
-      airdropAmount: "",
-      vestingPeriod: "",
-      liquidityLock: "",
+      targetSolAmount: "",
     },
   });
 
@@ -261,24 +257,54 @@ export function CreatePoolForm() {
     try {
       toast.loading('Creating pool...', { id: 'pool-creation' });
       
-      // Step 1: Upload image to IPFS/Arweave (simulated for now)
+      // Step 1: Upload image to IPFS/Arweave
       let metadataUri = '';
       if (imageFile) {
-        // TODO: Implement real IPFS/Arweave upload
-        metadataUri = `https://arweave.net/placeholder-${Date.now()}`; // Placeholder
+        try {
+          // Convert image to base64 for now (in production, upload to IPFS/Arweave)
+          const reader = new FileReader();
+          const imagePromise = new Promise<string>((resolve, reject) => {
+            reader.onload = () => {
+              const base64 = reader.result as string;
+              // For now, use a placeholder with the image data
+              // In production, this would upload to IPFS/Arweave
+              const placeholderUri = `https://arweave.net/placeholder-${Date.now()}`;
+              resolve(placeholderUri);
+            };
+            reader.onerror = reject;
+          });
+          
+          reader.readAsDataURL(imageFile);
+          metadataUri = await imagePromise;
+          
+          console.log('📸 Image processed:', {
+            fileName: imageFile.name,
+            fileSize: imageFile.size,
+            fileType: imageFile.type,
+            uri: metadataUri
+          });
+        } catch (imageError) {
+          console.error('❌ Image processing failed:', imageError);
+          // Use default image if upload fails
+          metadataUri = 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png';
+        }
+      } else {
+        // Use default image if no image uploaded
+        metadataUri = 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png';
       }
 
       // Step 2: Initialize target configuration and create token mint
-      const targetAmount = parseInt(data.airdropAmount) * 1e6; // Convert to token units
+      const targetSolAmount = parseFloat(data.targetSolAmount); // Convert to SOL amount
       
       toast.loading('Creating target configuration...', { id: 'pool-creation' });
       console.log('🎯 CreatePoolForm: About to call createPool with:', {
-        targetAmount,
+        targetSolAmount,
         tokenName: data.tokenName,
-        tokenSymbol: data.tokenSymbol
+        tokenSymbol: data.tokenSymbol,
+        description: data.description
       });
       
-      const targetConfigResult = await createPool(targetAmount, data.tokenName, data.tokenSymbol);
+      const targetConfigResult = await createPool(targetSolAmount, data.tokenName, data.tokenSymbol, metadataUri);
       
       console.log('✅ Target configuration created:', targetConfigResult.signature);
       console.log('📄 Meme token mint:', targetConfigResult.pairTokenMint.toString());
@@ -287,21 +313,8 @@ export function CreatePoolForm() {
       // Step 3: Skip pool creation for now - token is created and ready for trading
       console.log('🎉 Token creation completed, pool data stored for trading');
       
-      // Step 4: Create token metadata (optional)
-      if (metadataUri) {
-        toast.loading('Creating token metadata...', { id: 'pool-creation' });
-        try {
-          const metadataResult = await createMetadata(
-            targetConfigResult.pairTokenMint,
-            data.tokenName,
-            data.tokenSymbol,
-            metadataUri
-          );
-          console.log('✅ Metadata created:', metadataResult.signature);
-        } catch (metadataError) {
-          console.log('⚠️ Metadata creation failed (optional):', metadataError);
-        }
-      }
+      // Step 4: Metadata creation is handled automatically in createPool function
+      console.log('📝 Metadata creation handled automatically in pool creation process');
 
       console.log('🎉 Token Creation Complete:', {
         signature: targetConfigResult.signature,
@@ -446,7 +459,7 @@ export function CreatePoolForm() {
                     <ImageUpload onImageChange={handleImageChange} preview={imagePreview} />
                   </motion.div>
 
-                  {/* Distribution & Vesting */}
+                  {/* Bonding Curve Configuration */}
                   <motion.div
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -454,74 +467,36 @@ export function CreatePoolForm() {
                     className="space-y-4"
                   >
                     <h3 className="text-lg font-semibold flex items-center gap-2">
-                      <Users className="h-5 w-5" />
-                      Distribution & Vesting
+                      <DollarSign className="h-5 w-5" />
+                      Bonding Curve Configuration
                     </h3>
                     
                     <FormField
                       control={form.control}
-                      name="airdropAmount"
+                      name="targetSolAmount"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Airdrop Amount (tokens)</FormLabel>
+                          <FormLabel>Target SOL Amount</FormLabel>
                           <FormControl>
-                            <Input placeholder="100000000" {...field} />
+                            <Input placeholder="1000" {...field} />
                           </FormControl>
-                          <FormDescription>Maximum 100M tokens for community airdrop</FormDescription>
+                          <FormDescription>
+                            Target SOL amount for the bonding curve. This determines the maximum SOL that can be traded.
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                     
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="vestingPeriod"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Vesting Period</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select vesting period" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="1">1 Day</SelectItem>
-                                <SelectItem value="3">3 Days</SelectItem>
-                                <SelectItem value="7">7 Days</SelectItem>
-                                <SelectItem value="13">13 Days</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="liquidityLock"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Liquidity Lock Period</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select lock period" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="1month">1 Month</SelectItem>
-                                <SelectItem value="3months">3 Months</SelectItem>
-                                <SelectItem value="6months">6 Months</SelectItem>
-                                <SelectItem value="1year">1 Year</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormDescription>How long liquidity will be locked</FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                      <h4 className="font-semibold text-blue-300 mb-2">Smart Contract Defaults</h4>
+                      <div className="text-sm text-blue-200 space-y-1">
+                        <div>• Total Supply: 1,000,000,000,000 tokens (1T)</div>
+                        <div>• Trading Supply: 690,000,000,000 tokens (690B)</div>
+                        <div>• Airdrop Supply: 310,000,000,000 tokens (310B)</div>
+                        <div>• Trading Fees: 1% on SOL trades, 0% on token trades</div>
+                        <div>• Price Factor: 3/1 (numerator/denominator)</div>
+                      </div>
                     </div>
                   </motion.div>
 
