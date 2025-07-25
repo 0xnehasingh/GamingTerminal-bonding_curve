@@ -4,10 +4,49 @@ import { Program, AnchorProvider, Idl } from '@coral-xyz/anchor'
 export const SMART_CONTRACT_ADDRESS = new PublicKey('ip6SLxttjbSrQggmM2SH5RZXhWKq3onmkzj3kExoceN')
 
 export const SOLANA_NETWORK = 'devnet'
-export const RPC_ENDPOINT = 'https://solana-devnet.g.alchemy.com/v2/_gJukT1qzcSLlw__r0xkTBLdaDTbYYrH'
 
-export const getConnection = () => {
-  return new Connection(RPC_ENDPOINT, 'confirmed')
+// Multiple RPC endpoints for fallback
+export const RPC_ENDPOINTS = [
+  'https://api.devnet.solana.com', // Official Solana devnet
+  'https://solana-devnet.g.alchemy.com/v2/_gJukT1qzcSLlw__r0xkTBLdaDTbYYrH', // Alchemy devnet
+  'https://devnet.helius-rpc.com/?api-key=1aec0e5a-8c0f-4c0f-8c0f-4c0f8c0f4c0f', // Helius devnet (if available)
+]
+
+export const PRIMARY_RPC_ENDPOINT = RPC_ENDPOINTS[0]
+
+// Connection with better rate limiting configuration
+export const getConnection = (endpointIndex = 0) => {
+  const endpoint = RPC_ENDPOINTS[endpointIndex] || PRIMARY_RPC_ENDPOINT
+  
+  return new Connection(endpoint, {
+    commitment: 'confirmed',
+    confirmTransactionInitialTimeout: 60000, // 60 seconds
+    disableRetryOnRateLimit: false, // Enable retry on rate limit
+    httpHeaders: {
+      'Content-Type': 'application/json',
+    }
+  })
+}
+
+// Connection factory that can switch endpoints on rate limiting
+export const getConnectionWithFallback = () => {
+  let currentEndpointIndex = 0
+  
+  const createConnection = () => {
+    return getConnection(currentEndpointIndex)
+  }
+  
+  const switchEndpoint = () => {
+    currentEndpointIndex = (currentEndpointIndex + 1) % RPC_ENDPOINTS.length
+    console.log(`🔄 Switching to RPC endpoint ${currentEndpointIndex + 1}: ${RPC_ENDPOINTS[currentEndpointIndex]}`)
+    return createConnection()
+  }
+  
+  return {
+    createConnection,
+    switchEndpoint,
+    getCurrentEndpoint: () => RPC_ENDPOINTS[currentEndpointIndex]
+  }
 }
 
 export const getProgram = (provider: AnchorProvider, idl: Idl) => {
