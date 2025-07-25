@@ -14,6 +14,7 @@ export interface PoolData {
   createdAt: number
   createdBy: string
   targetAmount?: number
+  imageUri?: string
   price: number
   change24h: number
   volume24h: string
