@@ -4,7 +4,7 @@ import { Program, AnchorProvider, Idl } from '@coral-xyz/anchor'
 export const SMART_CONTRACT_ADDRESS = new PublicKey('ip6SLxttjbSrQggmM2SH5RZXhWKq3onmkzj3kExoceN')
 
 export const SOLANA_NETWORK = 'devnet'
-export const RPC_ENDPOINT = 'https://api.devnet.solana.com'
+export const RPC_ENDPOINT = 'https://solana-devnet.g.alchemy.com/v2/_gJukT1qzcSLlw__r0xkTBLdaDTbYYrH'
 
 export const getConnection = () => {
   return new Connection(RPC_ENDPOINT, 'confirmed')
