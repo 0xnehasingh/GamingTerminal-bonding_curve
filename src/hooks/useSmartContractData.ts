@@ -353,7 +353,7 @@ export const useSmartContractData = () => {
     }
   }, [connection])
 
-  // Main refresh function
+  // Main refresh function with caching
   const refreshContractData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
@@ -378,13 +378,41 @@ export const useSmartContractData = () => {
         ? (migrated / contractPools.length) * 100 
         : 0
 
-      setMetrics({
+      const newMetrics = {
         totalPools: contractPools.length,
         totalVolume: activityData.totalVolume,
         activeTraders: activityData.traders,
         migrationSuccessRate: migrationRate,
         recentActivities: activityData.activities
-      })
+      }
+      
+      setMetrics(newMetrics)
+
+      // Cache the data (convert PublicKey objects to strings for JSON storage)
+      try {
+        const poolsForCache = contractPools.map(pool => ({
+          ...pool,
+          poolAddress: pool.poolAddress.toString(),
+          poolSigner: pool.poolSigner.toString(),
+          tokenMint: pool.tokenMint.toString(),
+          quoteMint: pool.quoteMint.toString(),
+          memeVault: pool.memeVault.toString(),
+          quoteVault: pool.quoteVault.toString(),
+          targetConfig: pool.targetConfig.toString(),
+          creator: pool.creator.toString()
+        }))
+        
+        const metricsForCache = {
+          ...newMetrics,
+          activeTraders: Array.from(newMetrics.activeTraders)
+        }
+        
+        localStorage.setItem('smartContractPools', JSON.stringify(poolsForCache))
+        localStorage.setItem('smartContractMetrics', JSON.stringify(metricsForCache))
+        localStorage.setItem('smartContractTimestamp', Date.now().toString())
+      } catch (cacheError) {
+        console.warn('Failed to cache contract data:', cacheError)
+      }
 
       console.log('✅ Smart contract data refresh completed:', {
         pools: contractPools.length,
@@ -399,26 +427,87 @@ export const useSmartContractData = () => {
       setError(errorMessage)
       
       // Set fallback data on error
-      setPools([])
-      setMetrics({
+      const fallbackPools: SmartContractPool[] = []
+      const fallbackMetrics = {
         totalPools: 0,
         totalVolume: 0,
-        activeTraders: new Set(),
+        activeTraders: new Set<string>(),
         migrationSuccessRate: 0,
         recentActivities: []
-      })
+      }
+      
+      setPools(fallbackPools)
+      setMetrics(fallbackMetrics)
+      
+      // Cache fallback data
+      try {
+        localStorage.setItem('smartContractPools', JSON.stringify(fallbackPools))
+        localStorage.setItem('smartContractMetrics', JSON.stringify({
+          ...fallbackMetrics,
+          activeTraders: []
+        }))
+      } catch (cacheError) {
+        console.warn('Failed to cache fallback data:', cacheError)
+      }
     } finally {
       setIsLoading(false)
     }
   }, [scanAllPools, fetchContractActivity])
 
-  // Auto-refresh every 30 seconds
+  // Load cached data on mount, then fetch fresh data if needed
   useEffect(() => {
-    refreshContractData()
+    const loadCachedData = () => {
+      try {
+        const cachedPools = localStorage.getItem('smartContractPools')
+        const cachedMetrics = localStorage.getItem('smartContractMetrics')
+        const cachedTimestamp = localStorage.getItem('smartContractTimestamp')
+        
+        if (cachedPools && cachedMetrics) {
+          const parsedPools = JSON.parse(cachedPools)
+          const parsedMetrics = JSON.parse(cachedMetrics)
+          
+          // Convert PublicKey strings back to PublicKey objects
+          const poolsWithPubkeys = parsedPools.map((pool: any) => ({
+            ...pool,
+            poolAddress: new PublicKey(pool.poolAddress),
+            poolSigner: new PublicKey(pool.poolSigner),
+            tokenMint: new PublicKey(pool.tokenMint),
+            quoteMint: new PublicKey(pool.quoteMint),
+            memeVault: new PublicKey(pool.memeVault),
+            quoteVault: new PublicKey(pool.quoteVault),
+            targetConfig: new PublicKey(pool.targetConfig),
+            creator: new PublicKey(pool.creator)
+          }))
+          
+          // Convert activeTraders Set back from array
+          const metricsWithSet = {
+            ...parsedMetrics,
+            activeTraders: new Set(parsedMetrics.activeTraders)
+          }
+          
+          setPools(poolsWithPubkeys)
+          setMetrics(metricsWithSet)
+          
+          // Check if data is recent (less than 5 minutes old)
+          const timestamp = cachedTimestamp ? parseInt(cachedTimestamp) : 0
+          const isDataFresh = Date.now() - timestamp < 5 * 60 * 1000
+          
+          if (!isDataFresh) {
+            refreshContractData()
+          } else {
+            setIsLoading(false)
+          }
+        } else {
+          refreshContractData()
+        }
+      } catch (error) {
+        console.warn('Failed to load cached contract data:', error)
+        refreshContractData()
+      }
+    }
     
-    const interval = setInterval(refreshContractData, 30000)
-    return () => clearInterval(interval)
-  }, [refreshContractData])
+    loadCachedData()
+  }, [])  // Remove refreshContractData dependency to prevent auto-refresh
 
   return {
     pools,

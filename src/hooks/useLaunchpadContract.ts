@@ -376,6 +376,7 @@ export const useLaunchpadContract = () => {
     }
 
     console.log('🏊 Creating real pool with target SOL amount:', targetSolAmount)
+    console.log('📝 Token metadata:', { tokenName, tokenSymbol, imageUri })
     
     // Convert SOL amount to lamports for smart contract
     const tokenTargetAmount = Math.floor(targetSolAmount * LAMPORTS_PER_SOL)
@@ -709,7 +710,8 @@ export const useLaunchpadContract = () => {
           name: tokenName || 'Custom Token',
           symbol: tokenSymbol || 'CUSTOM',
           mint: pairTokenMint.toString(),
-          pool: pool.toString()
+          pool: pool.toString(),
+          imageUri: imageUri || 'No image URI provided'
         });
         
         try {
@@ -867,7 +869,8 @@ export const useLaunchpadContract = () => {
           tokenMint: pairTokenMint.toString(),
           poolAddress: pool.toString(),
           name: poolData.name,
-          symbol: poolData.symbol
+          symbol: poolData.symbol,
+          imageUri: poolData.imageUri
         })
 
         const createdPool = addPool(poolData)

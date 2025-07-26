@@ -61,8 +61,8 @@ const getMetadataPDA = (mint: PublicKey): PublicKey => {
   return metadataPDA
 }
 
-// Function to fetch token metadata from on-chain
-const fetchTokenMetadata = async (connection: Connection, tokenMint: PublicKey): Promise<{ name: string, symbol: string, uri: string } | null> => {
+// Function to fetch token metadata from on-chain and resolve image URI
+const fetchTokenMetadata = async (connection: Connection, tokenMint: PublicKey): Promise<{ name: string, symbol: string, uri: string, imageUri?: string } | null> => {
   try {
     const metadataPDA = getMetadataPDA(tokenMint)
     console.log(`🔍 Fetching metadata from PDA: ${metadataPDA.toString()} for token: ${tokenMint.toString()}`)
@@ -113,14 +113,56 @@ const fetchTokenMetadata = async (connection: Connection, tokenMint: PublicKey):
         if (parsedAttempt.data && parsedAttempt.data.name && parsedAttempt.data.symbol) {
           const { name, symbol, uri } = parsedAttempt.data
           console.log(`✅ Successfully extracted metadata: ${name} (${symbol})`)
-          return { name, symbol, uri }
+          
+          // Fetch the actual metadata JSON from the URI to get the image
+          let imageUri: string | undefined
+          if (uri && uri.length > 0) {
+            try {
+              console.log(`🌐 Fetching metadata JSON from: ${uri}`)
+              const response = await fetch(uri)
+              if (response.ok) {
+                const metadata = await response.json()
+                console.log(`📋 Metadata JSON:`, metadata)
+                
+                if (metadata.image) {
+                  imageUri = metadata.image
+                  console.log(`🖼️ Found image URI: ${imageUri}`)
+                }
+              }
+            } catch (fetchError) {
+              console.warn(`⚠️ Error fetching metadata JSON:`, fetchError)
+            }
+          }
+          
+          return { name, symbol, uri, imageUri }
         }
         
         // Try alternative structures
         if (parsedAttempt.name && parsedAttempt.symbol) {
           const { name, symbol, uri } = parsedAttempt
           console.log(`✅ Successfully extracted metadata (alt): ${name} (${symbol})`)
-          return { name, symbol, uri }
+          
+          // Fetch the actual metadata JSON from the URI to get the image
+          let imageUri: string | undefined
+          if (uri && uri.length > 0) {
+            try {
+              console.log(`🌐 Fetching metadata JSON from: ${uri}`)
+              const response = await fetch(uri)
+              if (response.ok) {
+                const metadata = await response.json()
+                console.log(`📋 Metadata JSON:`, metadata)
+                
+                if (metadata.image) {
+                  imageUri = metadata.image
+                  console.log(`🖼️ Found image URI: ${imageUri}`)
+                }
+              }
+            } catch (fetchError) {
+              console.warn(`⚠️ Error fetching metadata JSON:`, fetchError)
+            }
+          }
+          
+          return { name, symbol, uri, imageUri }
         }
       }
     } catch (parseError) {
@@ -225,7 +267,33 @@ const fetchTokenMetadata = async (connection: Connection, tokenMint: PublicKey):
       
       if (name && symbol) {
         console.log(`✅ Successfully manually parsed metadata for ${tokenMint.toString()}: ${name} (${symbol})`)
-        return { name, symbol, uri }
+        console.log(`🔗 Metadata URI: ${uri}`)
+        
+        // Fetch the actual metadata JSON from the URI to get the image
+        let imageUri: string | undefined
+        if (uri && uri.length > 0) {
+          try {
+            console.log(`🌐 Fetching metadata JSON from: ${uri}`)
+            const response = await fetch(uri)
+            if (response.ok) {
+              const metadata = await response.json()
+              console.log(`📋 Metadata JSON:`, metadata)
+              
+              if (metadata.image) {
+                imageUri = metadata.image
+                console.log(`🖼️ Found image URI: ${imageUri}`)
+              } else {
+                console.warn(`⚠️ No image field in metadata JSON`)
+              }
+            } else {
+              console.warn(`⚠️ Failed to fetch metadata JSON: ${response.status} ${response.statusText}`)
+            }
+          } catch (fetchError) {
+            console.warn(`⚠️ Error fetching metadata JSON:`, fetchError)
+          }
+        }
+        
+        return { name, symbol, uri, imageUri }
       } else {
         console.warn(`⚠️ Empty name or symbol after parsing: name="${name}", symbol="${symbol}"`)
         return null
@@ -561,6 +629,7 @@ export const useRealSmartContract = () => {
           // Fetch token metadata from on-chain
           let tokenName: string | undefined
           let tokenSymbol: string | undefined
+          let imageUri: string | undefined
           
           console.log(`🔍 Fetching metadata for token: ${tokenMint.toString()}`)
           try {
@@ -568,7 +637,11 @@ export const useRealSmartContract = () => {
             if (metadata) {
               tokenName = metadata.name
               tokenSymbol = metadata.symbol
+              imageUri = metadata.imageUri
               console.log(`✅ Blockchain metadata found: ${tokenName} (${tokenSymbol})`)
+              if (imageUri) {
+                console.log(`🖼️ Image URI found: ${imageUri}`)
+              }
             } else {
               console.log(`❌ No blockchain metadata found for token: ${tokenMint.toString()}`)
               console.log(`💡 This indicates:`)
@@ -663,6 +736,7 @@ export const useRealSmartContract = () => {
             targetConfig,
             tokenName,
             tokenSymbol,
+            imageUri,
             isActive,
             solBalance,
             tokenBalance,
@@ -800,7 +874,7 @@ export const useRealSmartContract = () => {
     }
   }, [connection])
 
-  // Main refresh function with fallback to demo data
+  // Main refresh function with caching and fallback to demo data
   const refreshContractData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
@@ -832,13 +906,41 @@ export const useRealSmartContract = () => {
         ? (migrated / realPools.length) * 100 
         : 0
       
-      setMetrics({
+      const newMetrics = {
         totalPools: realPools.length,
         totalVolume: activityData.totalVolume,
         activeTraders: activityData.traders as Set<string>,
         migrationSuccessRate: migrationRate,
         recentActivities: activityData.activities
-      })
+      }
+      
+      setMetrics(newMetrics)
+      
+      // Cache the data (convert PublicKey objects to strings for JSON storage)
+      try {
+        const poolsForCache = realPools.map(pool => ({
+          ...pool,
+          poolAddress: pool.poolAddress.toString(),
+          poolSigner: pool.poolSigner.toString(),
+          tokenMint: pool.tokenMint.toString(),
+          quoteMint: pool.quoteMint.toString(),
+          memeVault: pool.memeVault.toString(),
+          quoteVault: pool.quoteVault.toString(),
+          targetConfig: pool.targetConfig.toString(),
+          creator: pool.creator.toString()
+        }))
+        
+        const metricsForCache = {
+          ...newMetrics,
+          activeTraders: Array.from(newMetrics.activeTraders)
+        }
+        
+        localStorage.setItem('realSmartContractPools', JSON.stringify(poolsForCache))
+        localStorage.setItem('realSmartContractMetrics', JSON.stringify(metricsForCache))
+        localStorage.setItem('realSmartContractTimestamp', Date.now().toString())
+      } catch (cacheError) {
+        console.warn('Failed to cache real contract data:', cacheError)
+      }
       
       console.log('✅ Real smart contract data refresh completed:', {
         pools: realPools.length,
@@ -858,6 +960,32 @@ export const useRealSmartContract = () => {
       setPools(demoData.pools)
       setMetrics(demoData.metrics)
       
+      // Cache demo data too
+      try {
+        const poolsForCache = demoData.pools.map(pool => ({
+          ...pool,
+          poolAddress: pool.poolAddress.toString(),
+          poolSigner: pool.poolSigner.toString(),
+          tokenMint: pool.tokenMint.toString(),
+          quoteMint: pool.quoteMint.toString(),
+          memeVault: pool.memeVault.toString(),
+          quoteVault: pool.quoteVault.toString(),
+          targetConfig: pool.targetConfig.toString(),
+          creator: pool.creator.toString()
+        }))
+        
+        const metricsForCache = {
+          ...demoData.metrics,
+          activeTraders: Array.from(demoData.metrics.activeTraders)
+        }
+        
+        localStorage.setItem('realSmartContractPools', JSON.stringify(poolsForCache))
+        localStorage.setItem('realSmartContractMetrics', JSON.stringify(metricsForCache))
+        localStorage.setItem('realSmartContractTimestamp', Date.now().toString())
+      } catch (cacheError) {
+        console.warn('Failed to cache demo data:', cacheError)
+      }
+      
       console.log('🎭 Demo data loaded successfully:', {
         pools: demoData.pools.length,
         volume: demoData.metrics.totalVolume,
@@ -869,13 +997,63 @@ export const useRealSmartContract = () => {
     }
   }, [checkSmartContract, fetchRealPools, fetchRealActivity])
 
-  // Auto-refresh every 2 minutes to avoid rate limiting
+  // Load cached data on mount, then fetch fresh data if needed
   useEffect(() => {
-    refreshContractData()
+    const loadCachedData = () => {
+      try {
+        const cachedPools = localStorage.getItem('realSmartContractPools')
+        const cachedMetrics = localStorage.getItem('realSmartContractMetrics')
+        const cachedTimestamp = localStorage.getItem('realSmartContractTimestamp')
+        
+        if (cachedPools && cachedMetrics) {
+          const parsedPools = JSON.parse(cachedPools)
+          const parsedMetrics = JSON.parse(cachedMetrics)
+          
+          // Convert PublicKey strings back to PublicKey objects
+          const poolsWithPubkeys = parsedPools.map((pool: any) => ({
+            ...pool,
+            poolAddress: new PublicKey(pool.poolAddress),
+            poolSigner: new PublicKey(pool.poolSigner),
+            tokenMint: new PublicKey(pool.tokenMint),
+            quoteMint: new PublicKey(pool.quoteMint),
+            memeVault: new PublicKey(pool.memeVault),
+            quoteVault: new PublicKey(pool.quoteVault),
+            targetConfig: new PublicKey(pool.targetConfig),
+            creator: new PublicKey(pool.creator)
+          }))
+          
+          // Convert activeTraders Set back from array
+          const metricsWithSet = {
+            ...parsedMetrics,
+            activeTraders: new Set(parsedMetrics.activeTraders)
+          }
+          
+          setPools(poolsWithPubkeys)
+          setMetrics(metricsWithSet)
+          
+          // Check if data is recent (less than 10 minutes old)
+          const timestamp = cachedTimestamp ? parseInt(cachedTimestamp) : 0
+          const isDataFresh = Date.now() - timestamp < 10 * 60 * 1000
+          
+          if (!isDataFresh) {
+            console.log('🔄 Cached data is stale, refreshing...')
+            refreshContractData()
+          } else {
+            console.log('✅ Using fresh cached data')
+            setIsLoading(false)
+          }
+        } else {
+          console.log('🔄 No cached data found, fetching fresh data...')
+          refreshContractData()
+        }
+      } catch (error) {
+        console.warn('Failed to load cached real contract data:', error)
+        refreshContractData()
+      }
+    }
     
-    const interval = setInterval(refreshContractData, 120000) // 2 minutes instead of 30 seconds
-    return () => clearInterval(interval)
-  }, [refreshContractData])
+    loadCachedData()
+  }, [])  // Remove refreshContractData dependency to prevent auto-refresh
 
   return {
     pools,
