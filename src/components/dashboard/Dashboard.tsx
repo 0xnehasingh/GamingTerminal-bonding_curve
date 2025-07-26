@@ -26,7 +26,6 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useRealSmartContract } from "@/hooks/useRealSmartContract";
-import { SmartContractTester } from "@/components/debug/SmartContractTester";
 import { FeaturedTokensGrid } from "@/components/dashboard/FeaturedTokensGrid";
 
 // Animated Radial Chart Component
@@ -410,13 +409,32 @@ export function Dashboard() {
           </motion.div>
         </div>
 
+        {/* Optimization Status and Cache Manager */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+          >
+            {/* OptimizationStatus component was removed, so this section is now empty */}
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.7 }}
+          >
+            {/* CacheManager component was removed, so this section is now empty */}
+          </motion.div>
+        </div>
+
         {/* Smart Contract Tester */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
+          transition={{ duration: 0.6, delay: 0.8 }}
         >
-          <SmartContractTester />
+          {/* SmartContractTester component was removed, so this section is now empty */}
         </motion.div>
       </div>
     </div>

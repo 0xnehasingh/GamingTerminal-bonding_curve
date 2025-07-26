@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -55,6 +56,11 @@ const isLive = (index: number) => {
 };
 
 export function FeaturedTokensGrid({ pools, isLoading = false }: FeaturedTokensGridProps) {
+  const router = useRouter()
+
+  const handleTokenClick = (tokenMint: string) => {
+    router.push(`/trading?token=${tokenMint}`)
+  }
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -104,7 +110,16 @@ export function FeaturedTokensGrid({ pools, isLoading = false }: FeaturedTokensG
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {poolsWithMetadata.map((pool, index) => {
-        const thumbnailImage = getThumbnailImage(pool.tokenSymbol!, index);
+        // Use actual imageUri from pool data, fallback to demo image if not available
+        const thumbnailImage = pool.imageUri || getThumbnailImage(pool.tokenSymbol!, index);
+        
+        // Debug logging to see what image is being used
+        console.log(`🖼️ Pool ${pool.tokenName} (${pool.tokenSymbol}):`, {
+          hasImageUri: !!pool.imageUri,
+          imageUri: pool.imageUri,
+          finalImage: thumbnailImage
+        });
+        
         const creatorAddress = getCreatorAddress(index);
         const timeAgo = getTimeAgo(index);
         const replyCount = getReplyCount(index);
@@ -124,9 +139,10 @@ export function FeaturedTokensGrid({ pools, isLoading = false }: FeaturedTokensG
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.4, delay: index * 0.1 }}
             className="group cursor-pointer"
+            onClick={() => handleTokenClick(pool.tokenMint.toString())}
           >
             <Card className={cn(
-              "bg-slate-900/50 border-slate-700/50 overflow-hidden transition-all duration-300 hover:border-purple-500/30 hover:bg-slate-800/50",
+              "bg-slate-900/50 border-slate-700/50 overflow-hidden transition-all duration-300 hover:border-purple-500/30 hover:bg-slate-800/50 hover:scale-105",
               live && "ring-2 ring-green-500/30"
             )}>
               {/* Thumbnail */}
