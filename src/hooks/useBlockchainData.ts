@@ -142,7 +142,7 @@ export const useBlockchainData = () => {
     }
   }, [connection])
 
-  // Fetch recent transactions and activities
+  // Fetch recent transactions and activities with caching
   const fetchRecentActivity = useCallback(async () => {
     try {
       console.log('📈 Fetching recent blockchain activity...')
@@ -224,14 +224,22 @@ export const useBlockchainData = () => {
       }
 
       setRecentActivity(activities)
+      
+      // Cache the activity data
+      try {
+        localStorage.setItem('blockchainActivity', JSON.stringify(activities))
+      } catch (error) {
+        console.warn('Failed to cache activity data:', error)
+      }
+      
       console.log(`✅ Fetched ${activities.length} recent activities`)
       
     } catch (error) {
       console.error('❌ Error fetching recent activity:', error)
       // Fallback to simulated data
-      setRecentActivity([
+      const fallbackActivity = [
         {
-          type: 'pool_created',
+          type: 'pool_created' as const,
           user: '0x1234...5678',
           action: 'Created new pool',
           token: 'WOJAK',
@@ -239,14 +247,23 @@ export const useBlockchainData = () => {
           time: '2m ago'
         },
         {
-          type: 'trade',
+          type: 'trade' as const,
           user: '0x8765...4321',
           action: 'Bought tokens',
           token: 'PEPE',
           amount: '$12.5K',
           time: '5m ago'
         }
-      ])
+      ]
+      
+      setRecentActivity(fallbackActivity)
+      
+      // Cache fallback data
+      try {
+        localStorage.setItem('blockchainActivity', JSON.stringify(fallbackActivity))
+      } catch (error) {
+        console.warn('Failed to cache fallback activity data:', error)
+      }
     }
   }, [connection])
 
@@ -261,7 +278,7 @@ export const useBlockchainData = () => {
     return `${Math.floor(diff / 86400)}d ago`
   }
 
-  // Main data refresh function
+  // Main data refresh function with caching
   const refreshBlockchainData = useCallback(async () => {
     setIsLoading(true)
     console.log('🔄 Refreshing blockchain data...')
@@ -275,7 +292,8 @@ export const useBlockchainData = () => {
         })
       )
 
-      setFeaturedPools(enhancedPools.slice(0, 3)) // Top 3 pools
+      const topPools = enhancedPools.slice(0, 3)
+      setFeaturedPools(topPools)
 
       // Calculate metrics from enhanced pool data
       const totalPools = enhancedPools.length
@@ -289,41 +307,86 @@ export const useBlockchainData = () => {
       const migratedPools = enhancedPools.filter(pool => pool.migrationStatus === 'migrated').length
       const migrationRate = totalPools > 0 ? (migratedPools / totalPools) * 100 : 94.7
 
-      setMetrics({
+      const newMetrics = {
         totalPoolsCreated: totalPools,
         totalTradingVolume: totalVolume,
         activeTraders,
         migrationSuccessRate: migrationRate
-      })
+      }
+      
+      setMetrics(newMetrics)
 
       // Fetch recent activity
       await fetchRecentActivity()
+
+      // Cache the data
+      try {
+        localStorage.setItem('blockchainMetrics', JSON.stringify(newMetrics))
+        localStorage.setItem('blockchainPools', JSON.stringify(topPools))
+        localStorage.setItem('blockchainDataTimestamp', Date.now().toString())
+      } catch (error) {
+        console.warn('Failed to cache blockchain data:', error)
+      }
 
       console.log('✅ Blockchain data refresh completed')
     } catch (error) {
       console.error('❌ Error refreshing blockchain data:', error)
       
       // Fallback to enhanced static data if blockchain fetch fails
-      setMetrics({
+      const fallbackMetrics = {
         totalPoolsCreated: pools.length || 1247,
         totalTradingVolume: 240000,
         activeTraders: pools.reduce((sum, pool) => sum + pool.participants, 0) || 8932,
         migrationSuccessRate: 94.7
-      })
+      }
       
+      setMetrics(fallbackMetrics)
       setFeaturedPools(pools.slice(0, 3))
+      
+      // Cache fallback data
+      try {
+        localStorage.setItem('blockchainMetrics', JSON.stringify(fallbackMetrics))
+        localStorage.setItem('blockchainPools', JSON.stringify(pools.slice(0, 3)))
+      } catch (error) {
+        console.warn('Failed to cache fallback data:', error)
+      }
     } finally {
       setIsLoading(false)
     }
   }, [pools, fetchPoolBlockchainData, fetchRecentActivity])
 
-  // Auto-refresh every 30 seconds
+  // Load cached data on mount, then fetch fresh data
   useEffect(() => {
-    refreshBlockchainData()
+    const loadCachedData = () => {
+      try {
+        const cachedMetrics = localStorage.getItem('blockchainMetrics')
+        const cachedPools = localStorage.getItem('blockchainPools')
+        const cachedActivity = localStorage.getItem('blockchainActivity')
+        
+        if (cachedMetrics) {
+          setMetrics(JSON.parse(cachedMetrics))
+        }
+        if (cachedPools) {
+          setFeaturedPools(JSON.parse(cachedPools))
+        }
+        if (cachedActivity) {
+          setRecentActivity(JSON.parse(cachedActivity))
+        }
+        
+        // Only fetch fresh data if no cache exists
+        if (!cachedMetrics || !cachedPools || !cachedActivity) {
+          refreshBlockchainData()
+        } else {
+          setIsLoading(false)
+        }
+      } catch (error) {
+        console.warn('Failed to load cached blockchain data:', error)
+        refreshBlockchainData()
+      }
+    }
     
-    const interval = setInterval(refreshBlockchainData, 30000)
-    return () => clearInterval(interval)
-  }, [refreshBlockchainData])
+    loadCachedData()
+  }, [])  // Remove refreshBlockchainData dependency to prevent auto-refresh
 
   return {
     metrics,

@@ -1,18 +1,31 @@
 import { PublicKey, Connection } from '@solana/web3.js'
 import { Program, AnchorProvider, Idl } from '@coral-xyz/anchor'
 
+// Load environment variables only in Node.js environment
+if (typeof window === 'undefined' && typeof process !== 'undefined') {
+  try {
+    const dotenv = require('dotenv')
+    dotenv.config()
+  } catch (error) {
+    console.warn('dotenv not available in this environment')
+  }
+}
+
 export const SMART_CONTRACT_ADDRESS = new PublicKey('ip6SLxttjbSrQggmM2SH5RZXhWKq3onmkzj3kExoceN')
 
-export const SOLANA_NETWORK = 'devnet'
+export const SOLANA_NETWORK = process.env.SOLANA_NETWORK || 'devnet'
 
 // Multiple RPC endpoints for fallback
 export const RPC_ENDPOINTS = [
-  'https://api.devnet.solana.com', // Official Solana devnet
-  'https://solana-devnet.g.alchemy.com/v2/_gJukT1qzcSLlw__r0xkTBLdaDTbYYrH', // Alchemy devnet
-  'https://devnet.helius-rpc.com/?api-key=1aec0e5a-8c0f-4c0f-8c0f-4c0f8c0f4c0f', // Helius devnet (if available)
+  process.env.NEXT_PUBLIC_SOLANA_RPC_ENDPOINT 
 ]
 
 export const PRIMARY_RPC_ENDPOINT = RPC_ENDPOINTS[0]
+
+// Metaplex Token Metadata Program ID
+export const NEXT_PUBLIC_METAPLEX_PROGRAM_ID = new PublicKey(
+  process.env.NEXT_PUBLIC_METAPLEX_PROGRAM_ID 
+)
 
 // Connection with better rate limiting configuration
 export const getConnection = (endpointIndex = 0) => {

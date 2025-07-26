@@ -11,14 +11,36 @@ export const useLiveData = () => {
     priceMovements: new Map<string, number>()
   })
 
+  // Load data from cache on component mount
   useEffect(() => {
+    const loadCachedData = () => {
+      try {
+        const cached = localStorage.getItem('liveMetrics')
+        if (cached) {
+          const parsedData = JSON.parse(cached)
+          // Convert Map back from stored array format
+          const priceMovements = new Map(parsedData.priceMovements)
+          setLiveMetrics({
+            ...parsedData,
+            priceMovements
+          })
+        } else {
+          // Initial data generation only on first load
+          updateLiveData()
+        }
+      } catch (error) {
+        console.warn('Failed to load cached live metrics:', error)
+        updateLiveData()
+      }
+    }
+
     const updateLiveData = () => {
-      // Simulate live trading activity
+      // Generate live trading activity data
       const currentTime = Date.now()
       const simulatedVolume = Math.sin(currentTime / 60000) * 50000 + 100000 + Math.random() * 10000
       const simulatedTrades = Math.floor(Math.random() * 50) + 10
 
-      // Simulate price movements for each pool
+      // Generate price movements for each pool
       const priceMovements = new Map<string, number>()
       pools.forEach(pool => {
         // Small random price movements (-5% to +5%)
@@ -26,21 +48,59 @@ export const useLiveData = () => {
         priceMovements.set(pool.id, movement)
       })
 
-      setLiveMetrics({
+      const newMetrics = {
         totalVolume: simulatedVolume,
         activeTrades: simulatedTrades,
         priceMovements
-      })
+      }
+
+      setLiveMetrics(newMetrics)
+      
+      // Cache the data (convert Map to array for JSON storage)
+      try {
+        localStorage.setItem('liveMetrics', JSON.stringify({
+          ...newMetrics,
+          priceMovements: Array.from(priceMovements.entries())
+        }))
+      } catch (error) {
+        console.warn('Failed to cache live metrics:', error)
+      }
     }
 
-    // Update every 5 seconds for demo
-    const interval = setInterval(updateLiveData, 5000)
-    updateLiveData() // Initial update
-
-    return () => clearInterval(interval)
+    loadCachedData()
   }, [pools])
 
-  return liveMetrics
+  // Manual refresh function
+  const refreshLiveData = () => {
+    const currentTime = Date.now()
+    const simulatedVolume = Math.sin(currentTime / 60000) * 50000 + 100000 + Math.random() * 10000
+    const simulatedTrades = Math.floor(Math.random() * 50) + 10
+
+    const priceMovements = new Map<string, number>()
+    pools.forEach(pool => {
+      const movement = (Math.random() - 0.5) * 0.1
+      priceMovements.set(pool.id, movement)
+    })
+
+    const newMetrics = {
+      totalVolume: simulatedVolume,
+      activeTrades: simulatedTrades,
+      priceMovements
+    }
+
+    setLiveMetrics(newMetrics)
+    
+    try {
+      localStorage.setItem('liveMetrics', JSON.stringify({
+        ...newMetrics,
+        priceMovements: Array.from(priceMovements.entries())
+      }))
+    } catch (error) {
+      console.warn('Failed to cache live metrics:', error)
+    }
+  }
+
+  return { ...liveMetrics, refreshLiveData }
 }
 
 // Helper function to format large numbers
