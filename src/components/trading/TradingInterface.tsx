@@ -24,9 +24,11 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useLaunchpadContract } from "@/hooks/useLaunchpadContract";
 import { useRealSmartContract } from "@/hooks/useRealSmartContract";
+import { TradingChart } from "@/components/trading/TradingChart";
 import toast from 'react-hot-toast';
 
 // Smart contract pool interface
@@ -47,8 +49,11 @@ interface Pool {
   progress?: number
 }
 
+interface TradingInterfaceProps {
+  preSelectedTokenMint?: string | null;
+}
 
-export function TradingInterface() {
+export function TradingInterface({ preSelectedTokenMint }: TradingInterfaceProps) {
   const { pools, refreshContractData } = useRealSmartContract();
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
@@ -115,10 +120,26 @@ export function TradingInterface() {
   // Set default selected pool when pools are loaded
   useEffect(() => {
     if (tradingPools.length > 0 && !selectedPool) {
+      // If we have a pre-selected token from URL, find and select it
+      if (preSelectedTokenMint) {
+        const preSelectedPool = tradingPools.find(pool => 
+          pool.tokenMint === preSelectedTokenMint
+        );
+        
+        if (preSelectedPool) {
+          console.log('🎯 Pre-selecting pool from URL parameter:', preSelectedPool);
+          setSelectedPool(preSelectedPool);
+          return;
+        } else {
+          console.warn('⚠️ Pre-selected token not found in pools:', preSelectedTokenMint);
+        }
+      }
+      
+      // Fallback to first pool if no pre-selection or token not found
       console.log('🎯 Setting default selected pool:', tradingPools[0]);
       setSelectedPool(tradingPools[0]);
     }
-  }, [tradingPools, selectedPool]);
+  }, [tradingPools, selectedPool, preSelectedTokenMint]);
 
   const handleTrade = async () => {
     if (!connected || !contractConnected) {
@@ -290,126 +311,7 @@ export function TradingInterface() {
           <p className="text-slate-400">Buy and sell memecoins on bonding curves</p>
         </motion.div>
 
-        <div className="grid lg:grid-cols-4 gap-8">
-          {/* Pool List */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="lg:col-span-1"
-          >
-            <Card className="bg-slate-900/50 border-slate-700/50">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Coins className="h-5 w-5" />
-                    Available Pools
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={refreshContractData}
-                      className="text-slate-400 hover:text-white"
-                      title="Refresh smart contract data"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Smart Contract Debug Info */}
-                <div className="text-xs text-slate-500 mb-2 p-2 bg-slate-800 rounded">
-                  <div>Total Pools: {pools.length} | With Metadata: {poolsWithMetadata.length}</div>
-                  <div>Data Source: Direct from blockchain (filtered for metadata)</div>
-                  {tradingPools.length > 0 && (
-                    <div className="mt-1">
-                      <div>Pool tokens: {tradingPools.map(p => p.tokenSymbol || 'UNK').join(', ')}</div>
-                      <div>Token mints: {tradingPools.map(p => p.tokenMint.slice(0, 8) + '...').join(', ')}</div>
-                      <div>Active pools: {tradingPools.filter(p => p.isActive).length}</div>
-                    </div>
-                  )}
-                </div>
-                
-                {tradingPools.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-slate-400 mb-2">
-                      {pools.length === 0 
-                        ? "No pools created yet" 
-                        : "No tokens with metadata found"
-                      }
-                    </p>
-                    <p className="text-sm text-slate-500">
-                      {pools.length === 0 
-                        ? "Create a token first to see pools here" 
-                        : "Only tokens with proper blockchain metadata are displayed"
-                      }
-                    </p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={refreshContractData}
-                      className="mt-2"
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Refresh Contract
-                    </Button>
-                  </div>
-                ) : (
-                  tradingPools.map((pool) => (
-                  <motion.div
-                    key={pool.poolAddress}
-                    className={cn(
-                      "p-4 rounded-lg border cursor-pointer transition-all duration-300",
-                      selectedPool?.poolAddress === pool.poolAddress
-                        ? "border-primary bg-primary/10"
-                        : "border-slate-700/50 bg-slate-800/30 hover:border-slate-600"
-                    )}
-                    onClick={() => setSelectedPool(pool)}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <h3 className="font-semibold text-white">{pool.tokenName || 'Unknown Token'}</h3>
-                        <p className="text-sm text-slate-400">${pool.tokenSymbol || 'UNK'}</p>
-                      </div>
-                      <Badge
-                        variant={pool.isActive ? 'outline' : 'secondary'}
-                        className={cn(
-                          pool.isActive && "border-blue-500/30 text-blue-400",
-                          !pool.isActive && "border-red-500/30 text-red-400"
-                        )}
-                      >
-                        {pool.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </div>
-                    
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-white">
-                        ${pool.solBalance > 0 && pool.tokenBalance > 0 
-                          ? (pool.solBalance / pool.tokenBalance).toFixed(8) 
-                          : '0.00000001'}
-                      </span>
-                      <span className="text-slate-400">
-                        {pool.solBalance.toFixed(2)} SOL
-                      </span>
-                    </div>
-                    
-                    <div className="mt-2">
-                      <div className="flex justify-between text-xs text-slate-400 mb-1">
-                        <span>Tokens Traded</span>
-                        <span>{((pool.totalSupply - pool.tokenBalance) / pool.totalSupply * 100).toFixed(1)}%</span>
-                      </div>
-                      <Progress value={(pool.totalSupply - pool.tokenBalance) / pool.totalSupply * 100} className="h-1" />
-                    </div>
-                  </motion.div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-
+        <div className="grid lg:grid-cols-3 gap-8">
           {/* Trading Interface */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -465,6 +367,21 @@ export function TradingInterface() {
                   </button>
                 </div>
 
+                {/* Trading Chart */}
+                {selectedPool && (
+                  <TradingChart
+                    tokenSymbol={selectedPool.tokenSymbol || 'TOKEN'}
+                    tokenName={selectedPool.tokenName || 'Token'}
+                    currentPrice={selectedPool.solBalance > 0 && selectedPool.tokenBalance > 0 
+                      ? selectedPool.solBalance / selectedPool.tokenBalance 
+                      : 0.000001}
+                    priceChange24h={Math.random() * 20 - 10} // Mock data for now
+                    volume24h={selectedPool.volume24h || '$0'}
+                    marketCap={selectedPool.marketCap || '$0'}
+                    poolAddress={selectedPool.poolAddress}
+                    tokenMint={selectedPool.tokenMint}
+                  />
+                )}
 
                 {/* Blockchain Status Info */}
                 <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30 mb-4">
