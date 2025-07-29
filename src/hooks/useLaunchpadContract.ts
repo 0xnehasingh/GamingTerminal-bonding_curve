@@ -772,7 +772,7 @@ export const useLaunchpadContract = () => {
         symbol: tokenSymbol || 'CUSTOM',
         description: `A custom memecoin created with ${tokenTargetAmount} target amount`,
         mint: pairTokenMint.toString(),
-        poolAddress: pool.toString(), // Use actual pool address
+        poolAddress: pool.toString(),
         tokenMint: tokenMint.toString(),
         pairTokenMint: pairTokenMint.toString(),
         targetConfig: targetConfig.toString(),
@@ -789,6 +789,13 @@ export const useLaunchpadContract = () => {
       }
 
       console.log('🔧 About to add pool to storage:', poolData)
+      console.log('🖼️ Image URI being stored:', {
+        passedImageUri: imageUri,
+        finalImageUri: poolData.imageUri,
+        isLighthouseUrl: poolData.imageUri?.startsWith('https://gateway.lighthouse.storage/ipfs/'),
+        isDefaultUrl: poolData.imageUri?.includes('solana-labs/token-list')
+      })
+      
       const createdPool = addPool(poolData)
       console.log('💾 Stored pool data:', createdPool.name)
       console.log('📦 Pool added, should appear in trading interface')
@@ -870,7 +877,9 @@ export const useLaunchpadContract = () => {
           poolAddress: pool.toString(),
           name: poolData.name,
           symbol: poolData.symbol,
-          imageUri: poolData.imageUri
+          imageUri: poolData.imageUri,
+          passedImageUri: imageUri,
+          isLighthouseUrl: poolData.imageUri?.startsWith('https://gateway.lighthouse.storage/ipfs/')
         })
 
         const createdPool = addPool(poolData)
