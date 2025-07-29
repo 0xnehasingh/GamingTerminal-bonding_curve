@@ -6,7 +6,6 @@ import {
   TrendingUp, 
   TrendingDown, 
   ArrowUpDown,
-  Coins,
   DollarSign,
   Users,
   Target,
@@ -29,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { useLaunchpadContract } from "@/hooks/useLaunchpadContract";
 import { useRealSmartContract } from "@/hooks/useRealSmartContract";
 import { TradingChart } from "@/components/trading/TradingChart";
+import { RecentTrades } from "@/components/trading/RecentTrades";
 import toast from 'react-hot-toast';
 
 // Smart contract pool interface
@@ -381,6 +381,17 @@ export function TradingInterface({ preSelectedTokenMint }: TradingInterfaceProps
                     poolAddress={selectedPool.poolAddress}
                     tokenMint={selectedPool.tokenMint}
                   />
+                )}
+
+                {/* Recent Trades */}
+                {selectedPool && (
+                  <div className="mt-6">
+                    <RecentTrades 
+                      poolAddress={selectedPool.poolAddress}
+                      tokenMint={selectedPool.tokenMint}
+                      tokenSymbol={selectedPool.tokenSymbol || 'TOKEN'}
+                    />
+                  </div>
                 )}
 
                 {/* Blockchain Status Info */}
