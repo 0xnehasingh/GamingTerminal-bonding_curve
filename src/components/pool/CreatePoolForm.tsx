@@ -47,6 +47,7 @@ import { PublicKey, Keypair, Transaction } from '@solana/web3.js';
 import { useLaunchpadContract } from "@/hooks/useLaunchpadContract";
 import toast from 'react-hot-toast';
 import { Connection } from '@solana/web3.js';
+import lighthouse from '@lighthouse-web3/sdk';
 
 // Form validation schema - Aligned with smart contract requirements
 const poolFormSchema = z.object({
@@ -263,7 +264,16 @@ export function CreatePoolForm() {
   };
 
   const uploadImageAndCreateMetadata = async (tokenName: string, tokenSymbol: string): Promise<string> => {
+    console.log('🚀 Starting image upload process...');
+    console.log('📁 Image file details:', {
+      hasImageFile: !!imageFile,
+      fileName: imageFile?.name,
+      fileSize: imageFile?.size,
+      fileType: imageFile?.type
+    });
+    
     if (!imageFile) {
+      console.log('⚠️ No image file provided, using default image');
       // Use default image if no image uploaded
       return 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png';
     }
@@ -271,14 +281,104 @@ export function CreatePoolForm() {
     setIsUploadingImage(true);
     
     try {
-      console.log('📤 Image upload functionality removed - using default image');
+      console.log('📤 Uploading image to Lighthouse...');
       
-      // For now, just return the default image URL
-      // In the future, you can implement image upload here
-      return 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png';
+      // Get Lighthouse API key from environment
+      const lighthouseApiKey = process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY;
+      console.log('🔑 Lighthouse API key check:', {
+        hasApiKey: !!lighthouseApiKey,
+        apiKeyLength: lighthouseApiKey?.length,
+        apiKeyPrefix: lighthouseApiKey?.substring(0, 10)
+      });
+      
+      if (!lighthouseApiKey) {
+        throw new Error('NEXT_PUBLIC_LIGHTHOUSE_API_KEY is required in environment variables');
+      }
+      
+      console.log('📁 File details:', { name: imageFile.name, size: imageFile.size, type: imageFile.type });
+      console.log('🔑 Using Lighthouse API key:', lighthouseApiKey.substring(0, 10) + '...');
+
+      // Upload image to Lighthouse
+      console.log('📤 Calling lighthouse.upload...');
+      const uploadResponse = await lighthouse.upload([imageFile], lighthouseApiKey, 0);
+      console.log('📤 Lighthouse upload response:', uploadResponse);
+
+      if (!uploadResponse.data) {
+        throw new Error('Lighthouse upload failed: No data returned');
+      }
+
+      let uploadedFile: any;
+      if (Array.isArray(uploadResponse.data)) {
+        if (uploadResponse.data.length === 0) {
+          throw new Error('Lighthouse upload failed: No files in response');
+        }
+        uploadedFile = uploadResponse.data[0];
+      } else {
+        uploadedFile = uploadResponse.data;
+      }
+      
+      console.log('📄 Uploaded file data:', uploadedFile);
+
+      const imageCid = uploadedFile.Hash || uploadedFile.hash;
+      const imageUrl = `https://gateway.lighthouse.storage/ipfs/${imageCid}`;
+      
+      console.log('✅ Image uploaded successfully:', { cid: imageCid, url: imageUrl });
+
+      // Create metadata JSON
+      console.log('📝 Creating metadata JSON...');
+      const metadataJson = {
+        name: tokenName,
+        symbol: tokenSymbol,
+        description: `Token metadata for ${tokenName}`,
+        image: imageUrl,
+        attributes: [],
+        properties: {
+          files: [{ type: imageFile.type, uri: imageUrl }],
+          category: 'image',
+          creators: []
+        }
+      };
+      
+      console.log('📄 Metadata JSON:', metadataJson);
+
+      // Upload metadata JSON to Lighthouse
+      const metadataString = JSON.stringify(metadataJson, null, 2);
+      const metadataBlob = new Blob([metadataString], { type: 'application/json' });
+      const metadataFile = new File([metadataBlob], 'metadata.json', { type: 'application/json' });
+
+      console.log('📤 Uploading metadata to Lighthouse...');
+      const metadataUploadResponse = await lighthouse.upload([metadataFile], lighthouseApiKey, 0);
+      console.log('📤 Metadata upload response:', metadataUploadResponse);
+
+      if (!metadataUploadResponse.data) {
+        throw new Error('Metadata upload failed: No data returned');
+      }
+
+      let uploadedMetadataFile: any;
+      if (Array.isArray(metadataUploadResponse.data)) {
+        if (metadataUploadResponse.data.length === 0) {
+          throw new Error('Metadata upload failed: No files in response');
+        }
+        uploadedMetadataFile = metadataUploadResponse.data[0];
+      } else {
+        uploadedMetadataFile = metadataUploadResponse.data;
+      }
+
+      const metadataCid = uploadedMetadataFile.Hash || uploadedMetadataFile.hash;
+      const metadataUrl = `https://gateway.lighthouse.storage/ipfs/${metadataCid}`;
+      
+      console.log('✅ Metadata uploaded successfully:', { cid: metadataCid, url: metadataUrl });
+      console.log('🎉 Complete upload process finished successfully!');
+      
+      return metadataUrl;
       
     } catch (error) {
       console.error('❌ Image upload failed:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       toast.error('Failed to upload image. Using default image.');
       
       // Fallback to default image
@@ -335,6 +435,8 @@ export function CreatePoolForm() {
         fileSize: imageFile?.size,
         fileType: imageFile?.type,
         metadataUri,
+        metadataUriType: typeof metadataUri,
+        metadataUriLength: metadataUri?.length
       });
 
       // Step 2: Initialize target configuration and create token mint
@@ -346,7 +448,8 @@ export function CreatePoolForm() {
         tokenName: data.tokenName,
         tokenSymbol: data.tokenSymbol,
         description: data.description,
-        metadataUri
+        metadataUri,
+        metadataUriStartsWithIPFS: metadataUri?.startsWith('https://gateway.lighthouse.storage/ipfs/')
       });
       
       const targetConfigResult = await createPool(targetSolAmount, data.tokenName, data.tokenSymbol, metadataUri);
@@ -354,6 +457,7 @@ export function CreatePoolForm() {
       console.log('✅ Target configuration created:', targetConfigResult.signature);
       console.log('📄 Meme token mint:', targetConfigResult.pairTokenMint.toString());
       console.log('💾 Pool data should be stored:', targetConfigResult.poolData);
+      console.log('🖼️ Pool data imageUri:', targetConfigResult.poolData?.imageUri);
       
       // Step 3: Create on-chain metadata for the actual token mint
       if (targetConfigResult.pairTokenMint) {
