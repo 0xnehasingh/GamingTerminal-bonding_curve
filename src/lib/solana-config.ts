@@ -17,14 +17,14 @@ export const SOLANA_NETWORK = process.env.SOLANA_NETWORK || 'devnet'
 
 // Multiple RPC endpoints for fallback
 export const RPC_ENDPOINTS = [
-  process.env.NEXT_PUBLIC_SOLANA_RPC_ENDPOINT 
+  process.env.SOLANA_RPC_ENDPOINT || 'https://solana-devnet.g.alchemy.com/v2/TcXnr-fAXwTb_KEEHEvSo'
 ]
 
 export const PRIMARY_RPC_ENDPOINT = RPC_ENDPOINTS[0]
 
 // Metaplex Token Metadata Program ID
-export const NEXT_PUBLIC_METAPLEX_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_METAPLEX_PROGRAM_ID 
+export const METAPLEX_PROGRAM_ID = new PublicKey(
+  process.env.METAPLEX_PROGRAM_ID || 'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
 )
 
 // Connection with better rate limiting configuration
